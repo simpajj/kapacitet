@@ -66,15 +66,28 @@ have to build it from source. Kapacitet is built with Rust, so
 please refer to [this](https://www.rust-lang.org/tools/install) on how
 to get started.
 
-Kapacitet lets you add contributors directly from the command line 
-or from a CSV file. The contributors CSV should look like this:
+Kapacitet lets you add contributors and roadmap items directly from 
+the command line or from CSV files. 
+
+The contributors CSV should look like this:
 
 ```
 name,seniority
 Contributor Uno,5
 ```
 
-with the seniority being an integer between 1 and 5.
+with `seniority` being an integer between 1 and 5.
+
+The roadmap CSV should look like this:
+
+```
+name,estimated_complexity,estimated_value,start_date,target_date
+MVP,4,5,2022-06-01,2022-11-01
+```
+
+with `estimated_complexity` and `estimated_value` being integers 
+between 1 and 5 and `start_date` and `target_date` following the 
+date format `YYYY-mm-dd`.
 
 ## TODO
 
