@@ -3,8 +3,11 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use chrono::NaiveDate;
+use serde::Deserialize;
+use validator::{Validate, ValidationError};
 
 use crate::contributor::Contributor;
+use crate::parse_date;
 
 static MAX_ESTIMATED_COMPLEXITY: f64 = 5.0;
 static MIN_ESTIMATED_COMPLEXITY: f64 = 0.0;
@@ -20,15 +23,19 @@ static DURATION_FACTOR: f64 = 0.1;
 static COMPLEXITY_FACTOR: f64 = 0.3;
 static VALUE_FACTOR: f64 = 0.4;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Validate)]
+#[validate(schema(function = "validate_dates", skip_on_field_errors = false))]
 pub struct RoadmapItem {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
     pub name: String,
+    #[validate(range(min = 1, max = 5, message = "Complexity must be between 1 and 5"))]
     pub estimated_complexity: usize,
+    #[validate(range(min = 1, max = 5, message = "Value must be between 1 and 5"))]
     pub estimated_value: usize,
     pub start_date: NaiveDate,
     pub target_date: NaiveDate,
-    pub urgency: f64,
-    pub contributors: Vec<Contributor>,
+    pub urgency: Option<f64>,
+    pub contributors: Option<Vec<Contributor>>,
 }
 
 impl RoadmapItem {
@@ -46,18 +53,35 @@ impl RoadmapItem {
             estimated_value,
             start_date,
             target_date,
-            urgency: calculate_project_urgency(
+            urgency: Some(calculate_project_urgency(
                 estimated_complexity,
                 estimated_value,
                 start_date,
                 target_date,
-            ),
-            contributors,
+            )),
+            contributors: Some(contributors),
         };
     }
 
     pub fn add_contributors(mut self, contributors: Vec<Contributor>) {
-        self.contributors = contributors;
+        self.contributors = Some(contributors);
+    }
+
+    pub fn get_urgency(&self) -> f64 {
+        self.urgency.unwrap_or_else(|| 0.0)
+    }
+
+    pub fn get_contributors(&self) -> Vec<Contributor> {
+        self.contributors.clone().unwrap_or_else(|| Vec::new())
+    }
+
+    pub fn update_urgency(&mut self) {
+        self.urgency = Some(calculate_project_urgency(
+            self.estimated_complexity,
+            self.estimated_value,
+            self.start_date,
+            self.target_date,
+        ));
     }
 }
 
@@ -136,9 +160,9 @@ impl PartialEq for RoadmapItem {
                 .signed_duration_since(other.target_date)
                 .is_zero()
             && self
-                .contributors
+                .get_contributors()
                 .iter()
-                .all(|contributor| other.contributors.contains(contributor))
+                .all(|contributor| other.get_contributors().contains(contributor))
     }
 }
 
@@ -152,13 +176,39 @@ impl Display for RoadmapItem {
             self.name,
             self.start_date,
             self.target_date,
-            self.urgency,
-            self.contributors
+            self.urgency.unwrap_or_else(|| 0.0),
+            self.get_contributors()
                 .iter()
                 .map(|contributor| format!("{}", contributor.name))
                 .fold(String::new(), |acc, arg| acc + arg.as_str() + ";")
         )
     }
+}
+
+fn validate_dates(item: &RoadmapItem) -> Result<(), ValidationError> {
+    let date_diff = item
+        .target_date
+        .signed_duration_since(item.start_date)
+        .num_days();
+    if date_diff.is_negative() {
+        return Err(ValidationError::new(
+            "The target date cannot be before the start date.",
+        ));
+    }
+
+    let today = chrono::offset::Local::today().naive_utc();
+    if item
+        .target_date
+        .signed_duration_since(today)
+        .num_days()
+        .is_negative()
+    {
+        return Err(ValidationError::new(
+            "The target date cannot be before today.",
+        ));
+    }
+
+    return Ok(());
 }
 
 // Use this to play around with the complexity formula

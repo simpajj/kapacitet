@@ -141,7 +141,58 @@ fn create_contributor_from_stdin() -> Contributor {
 fn create_roadmap_items() -> Vec<RoadmapItem> {
     println!("Let's add all roadmap items!");
     let mut roadmap_items: Vec<RoadmapItem> = Vec::new();
-    roadmap_items.push(create_roadmap_item());
+    loop {
+        print!("Do you have a roadmap file? (y/n): ");
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+
+        match input.trim_end().to_lowercase().as_str() {
+            "y" => {
+                roadmap_items.append(&mut create_roadmap_items_from_file());
+                return roadmap_items;
+            }
+            "n" => {
+                roadmap_items.append(&mut create_roadmap_items_from_stdin());
+                return roadmap_items;
+            }
+            _ => {
+                continue;
+            }
+        }
+    }
+}
+
+fn create_roadmap_items_from_file() -> Vec<RoadmapItem> {
+    loop {
+        print!("Please provide the absolute path to your roadmap file: ");
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+
+        let mut roadmap_items: Vec<RoadmapItem> = Vec::new();
+        match csv::Reader::from_path(input.trim_end()) {
+            Ok(mut rdr) => {
+                for roadmap_item_result in rdr.deserialize::<RoadmapItem>() {
+                    roadmap_items.push(create_roadmap_item_from_file(roadmap_item_result));
+                }
+            }
+            Err(_) => {
+                panic!("Unable to read roadmap file. Make sure that it has the right format!")
+            }
+        };
+        return roadmap_items;
+    }
+}
+
+fn create_roadmap_items_from_stdin() -> Vec<RoadmapItem> {
+    let mut roadmap_items: Vec<RoadmapItem> = Vec::new();
+    println!("Let's create our first roadmap item!");
+    roadmap_items.push(create_roadmap_item_from_stdin());
     loop {
         print!("Add another roadmap item? (y/n): ");
         let mut input = String::new();
@@ -152,7 +203,7 @@ fn create_roadmap_items() -> Vec<RoadmapItem> {
 
         match input.trim_end().to_lowercase().as_str() {
             "y" => {
-                roadmap_items.push(create_roadmap_item());
+                roadmap_items.push(create_roadmap_item_from_stdin());
             }
             "n" => {
                 println!("All roadmap items added!");
@@ -165,7 +216,28 @@ fn create_roadmap_items() -> Vec<RoadmapItem> {
     }
 }
 
-fn create_roadmap_item() -> RoadmapItem {
+fn create_roadmap_item_from_file(
+    roadmap_item_result: Result<RoadmapItem, csv::Error>,
+) -> RoadmapItem {
+    match roadmap_item_result {
+        Ok(mut roadmap_item) => {
+            match roadmap_item.validate() {
+                Ok(_) => {
+                    roadmap_item.update_urgency();
+                    return roadmap_item;
+                }
+                Err(_) => {
+                    panic!("Invalid roadmap item {roadmap_item}. Make sure that all contributors have valid values!")
+                }
+            };
+        }
+        Err(err) => {
+            panic!("Malformed roadmap item. Make sure that all roadmap items have the right format! {err}")
+        }
+    }
+}
+
+fn create_roadmap_item_from_stdin() -> RoadmapItem {
     let name = parse_string("Roadmap item name");
     let estimated_complexity = parse_number("Estimated complexity (1-5)", 1, 5);
     let estimated_value = parse_number("Estimated value (1-5)", 1, 5);
@@ -268,7 +340,7 @@ fn assign_contributors(
     let mut new_items: Vec<RoadmapItem> = Vec::new();
     roadmap_items.iter().for_each(|item| {
         let mut item_contributors: Vec<Contributor> = Vec::new();
-        if item.urgency >= COMPLEXITY_SECOND_THRESHOLD {
+        if item.get_urgency() >= COMPLEXITY_SECOND_THRESHOLD {
             match contributors.first() {
                 None => {}
                 Some(contributor) => {
@@ -301,7 +373,7 @@ fn assign_contributors(
                         .push(Contributor::new(String::from(c.name.as_str()), c.seniority));
                 }
             }
-        } else if item.urgency >= COMPLEXITY_FIRST_THRESHOLD {
+        } else if item.get_urgency() >= COMPLEXITY_FIRST_THRESHOLD {
             match contributors.first() {
                 None => {}
                 Some(contributor) => {
