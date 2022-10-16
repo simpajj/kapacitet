@@ -66,6 +66,16 @@ have to build it from source. Kapacitet is built with Rust, so
 please refer to [this](https://www.rust-lang.org/tools/install) on how
 to get started.
 
+Kapacitet lets you add contributors directly from the command line 
+or from a CSV file. The contributors CSV should look like this:
+
+```
+name,seniority
+Contributor Uno,5
+```
+
+with the seniority being an integer between 1 and 5.
+
 ## TODO
 
 Kapacitet currently lacks the capability to schedule future

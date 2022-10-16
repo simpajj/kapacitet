@@ -1,10 +1,14 @@
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use validator::Validate;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 pub struct Contributor {
+    #[validate(length(min = 1, message = "Name cannot be empty"))]
     pub name: String,
+    #[validate(range(min = 1, max = 5, message = "Seniority must be between 1 and 5"))]
     pub seniority: usize,
 }
 

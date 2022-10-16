@@ -1,9 +1,12 @@
+extern crate core;
+
 use std::io;
 use std::io::Write;
 use std::num::ParseIntError;
 
 use chrono::{NaiveDate, ParseResult};
 use rand::prelude::IteratorRandom;
+use validator::Validate;
 
 use crate::contributor::Contributor;
 use crate::roadmap::RoadmapItem;
@@ -32,9 +35,59 @@ fn main() {
 }
 
 fn create_contributors() -> Vec<Contributor> {
-    println!("Let's start by adding all contributors!");
     let mut contributors: Vec<Contributor> = Vec::new();
-    contributors.push(create_contributor());
+    loop {
+        print!("Do you have a contributors file? (y/n): ");
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+
+        match input.trim_end().to_lowercase().as_str() {
+            "y" => {
+                contributors.append(&mut create_contributors_from_file());
+                return contributors;
+            }
+            "n" => {
+                contributors.append(&mut create_contributors_from_stdin());
+                return contributors;
+            }
+            _ => {
+                continue;
+            }
+        }
+    }
+}
+
+fn create_contributors_from_file() -> Vec<Contributor> {
+    loop {
+        print!("Please provide the absolute path to your contributors file: ");
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+
+        let mut contributors: Vec<Contributor> = Vec::new();
+        match csv::Reader::from_path(input.trim_end()) {
+            Ok(mut rdr) => {
+                for contributor_result in rdr.deserialize::<Contributor>() {
+                    contributors.push(create_contributor_from_file(contributor_result));
+                }
+            }
+            Err(_) => {
+                panic!("Unable to read contributors file. Make sure that it has the right format!")
+            }
+        };
+        return contributors;
+    }
+}
+
+fn create_contributors_from_stdin() -> Vec<Contributor> {
+    let mut contributors: Vec<Contributor> = Vec::new();
+    println!("Let's add our first contributor!");
+    contributors.push(create_contributor_from_stdin());
     loop {
         print!("Add another contributor? (y/n): ");
         let mut input = String::new();
@@ -45,7 +98,7 @@ fn create_contributors() -> Vec<Contributor> {
 
         match input.trim_end().to_lowercase().as_str() {
             "y" => {
-                contributors.push(create_contributor());
+                contributors.push(create_contributor_from_stdin());
             }
             "n" => {
                 println!("All contributors added!");
@@ -58,7 +111,27 @@ fn create_contributors() -> Vec<Contributor> {
     }
 }
 
-fn create_contributor() -> Contributor {
+fn create_contributor_from_file(
+    contributor_result: Result<Contributor, csv::Error>,
+) -> Contributor {
+    match contributor_result {
+        Ok(contributor) => {
+            match contributor.validate() {
+                Ok(_) => {
+                    return contributor;
+                }
+                Err(_) => {
+                    panic!("Invalid contributor {contributor}. Make sure that all contributors have valid values!")
+                }
+            };
+        }
+        Err(err) => {
+            panic!("Malformed contributor. Make sure that all contributors have the right format! {err}")
+        }
+    }
+}
+
+fn create_contributor_from_stdin() -> Contributor {
     let name = parse_string("Contributor name");
     let seniority = parse_number("Contributor seniority (1-5)", 1, 5);
 
