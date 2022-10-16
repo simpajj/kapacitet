@@ -95,27 +95,27 @@ fn calculate_project_urgency(
     let today = chrono::offset::Local::today().naive_utc();
     let days_from_today =
         TARGET_DATE_FACTOR / target_date.signed_duration_since(today).num_days() as f64;
-    println!("Days from today: {days_from_today}");
+    debug!("Days from today: {days_from_today}");
 
     // 2. Duration - the shorter the more urgent
     let project_duration =
         DURATION_FACTOR / target_date.signed_duration_since(start_date).num_days() as f64;
-    println!("Duration: {project_duration}");
+    debug!("Duration: {project_duration}");
 
     // 3. Estimated complexity - the higher the more urgent
     let complexity = (estimated_complexity as f64 - MIN_ESTIMATED_COMPLEXITY)
         / (MAX_ESTIMATED_COMPLEXITY - MIN_ESTIMATED_COMPLEXITY)
         * COMPLEXITY_FACTOR;
-    println!("Complexity: {complexity}");
+    debug!("Complexity: {complexity}");
 
     // Estimated value - the more value added the more urgent
     let value = (estimated_value as f64 - MIN_ESTIMATED_VALUE)
         / (MAX_ESTIMATED_VALUE - MIN_ESTIMATED_VALUE)
         * VALUE_FACTOR;
-    println!("Value: {value}");
+    debug!("Value: {value}");
 
     let total = days_from_today + project_duration + complexity + value;
-    println!("Total: {total}");
+    debug!("Total: {total}");
 
     (f64::max(
         0.0,

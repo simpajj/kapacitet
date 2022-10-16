@@ -1,11 +1,15 @@
 extern crate core;
+#[macro_use]
+extern crate log;
+extern crate simplelog;
 
-use std::io;
 use std::io::Write;
 use std::num::ParseIntError;
+use std::{io, process};
 
 use chrono::{NaiveDate, ParseResult};
 use rand::prelude::IteratorRandom;
+use simplelog::*;
 use validator::Validate;
 
 use crate::contributor::Contributor;
@@ -18,6 +22,14 @@ static COMPLEXITY_FIRST_THRESHOLD: f64 = 0.3;
 static COMPLEXITY_SECOND_THRESHOLD: f64 = 0.6;
 
 fn main() {
+    CombinedLogger::init(vec![TermLogger::new(
+        LevelFilter::Warn,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )])
+    .unwrap();
+
     let mut contributors = create_contributors();
     let mut roadmap_items = create_roadmap_items();
     roadmap_items.sort();
@@ -77,7 +89,8 @@ fn create_contributors_from_file() -> Vec<Contributor> {
                 }
             }
             Err(_) => {
-                panic!("Unable to read contributors file. Make sure that it has the right format!")
+                error!("Unable to read contributors file. Make sure that it has the right format!");
+                process::exit(1);
             }
         };
         return contributors;
@@ -121,12 +134,14 @@ fn create_contributor_from_file(
                     return contributor;
                 }
                 Err(_) => {
-                    panic!("Invalid contributor {contributor}. Make sure that all contributors have valid values!")
+                    error!("Invalid contributor {contributor}. Make sure that all contributors have valid values!");
+                    process::exit(1);
                 }
             };
         }
         Err(err) => {
-            panic!("Malformed contributor. Make sure that all contributors have the right format! {err}")
+            error!("Malformed contributor. Make sure that all contributors have the right format! {err}");
+            process::exit(1);
         }
     }
 }
@@ -182,7 +197,8 @@ fn create_roadmap_items_from_file() -> Vec<RoadmapItem> {
                 }
             }
             Err(_) => {
-                panic!("Unable to read roadmap file. Make sure that it has the right format!")
+                error!("Unable to read roadmap file. Make sure that it has the right format!");
+                process::exit(1);
             }
         };
         return roadmap_items;
@@ -227,12 +243,14 @@ fn create_roadmap_item_from_file(
                     return roadmap_item;
                 }
                 Err(_) => {
-                    panic!("Invalid roadmap item {roadmap_item}. Make sure that all contributors have valid values!")
+                    error!("Invalid roadmap item {roadmap_item}. Make sure that all contributors have valid values!");
+                    process::exit(1);
                 }
             };
         }
         Err(err) => {
-            panic!("Malformed roadmap item. Make sure that all roadmap items have the right format! {err}")
+            error!("Malformed roadmap item. Make sure that all roadmap items have the right format! {err}");
+            process::exit(1);
         }
     }
 }
@@ -246,7 +264,7 @@ fn create_roadmap_item_from_stdin() -> RoadmapItem {
         let target_date = parse_date("Target date");
         let date_diff = target_date.signed_duration_since(start_date).num_days();
         if date_diff.is_negative() {
-            println!("The target date cannot be before the start date.");
+            warn!("The target date cannot be before the start date.");
             continue;
         }
 
@@ -256,7 +274,7 @@ fn create_roadmap_item_from_stdin() -> RoadmapItem {
             .num_days()
             .is_negative()
         {
-            println!("The target date cannot be before today.");
+            warn!("The target date cannot be before today.");
             continue;
         }
 
@@ -287,13 +305,13 @@ fn parse_number(text: &'static str, min: usize, max: usize) -> usize {
         match parse_usize() {
             Ok(complexity) => {
                 if complexity < min || complexity > max {
-                    println!("The value must be between {min} and {max}");
+                    warn!("The value must be between {min} and {max}");
                     continue;
                 }
                 return complexity;
             }
             Err(err) => {
-                println!("Could not parse number: {err}");
+                warn!("Could not parse number: {err}");
                 continue;
             }
         };
@@ -308,7 +326,7 @@ fn parse_date(input_text: &'static str) -> NaiveDate {
                 return date;
             }
             Err(err) => {
-                println!("Could not parse date: {err}");
+                warn!("Could not parse date: {err}");
                 continue;
             }
         };
@@ -339,25 +357,32 @@ fn assign_contributors(
 ) -> Vec<RoadmapItem> {
     let mut new_items: Vec<RoadmapItem> = Vec::new();
     roadmap_items.iter().for_each(|item| {
+        info!("Assigning contributors to item {item}");
         let mut item_contributors: Vec<Contributor> = Vec::new();
         if item.get_urgency() >= COMPLEXITY_SECOND_THRESHOLD {
             match contributors.first() {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some(contributor) => {
                     item_contributors.push(Contributor::new(
                         String::from(contributor.name.as_str()),
                         contributor.seniority,
                     ));
+                    info!("Assigned contributor {contributor} to item {item}");
                     contributors.remove(0);
                 }
             }
             match contributors.last() {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some(contributor) => {
                     item_contributors.push(Contributor::new(
                         String::from(contributor.name.as_str()),
                         contributor.seniority,
                     ));
+                    info!("Assigned contributor {contributor} to item {item}");
                     contributors.remove(contributors.len() - 1);
                 }
             }
@@ -366,31 +391,40 @@ fn assign_contributors(
                 .enumerate()
                 .choose(&mut rand::thread_rng())
             {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some((i, _)) => {
                     let c = &contributors.remove(i);
                     item_contributors
                         .push(Contributor::new(String::from(c.name.as_str()), c.seniority));
+                    info!("Assigned contributor {c} to item {item}");
                 }
             }
         } else if item.get_urgency() >= COMPLEXITY_FIRST_THRESHOLD {
             match contributors.first() {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some(contributor) => {
                     item_contributors.push(Contributor::new(
                         String::from(contributor.name.as_str()),
                         contributor.seniority,
                     ));
+                    info!("Assigned contributor {contributor} to item {item}");
                     contributors.remove(0);
                 }
             }
             match contributors.last() {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some(contributor) => {
                     item_contributors.push(Contributor::new(
                         String::from(contributor.name.as_str()),
                         contributor.seniority,
                     ));
+                    info!("Assigned contributor {contributor} to item {item}");
                     contributors.remove(contributors.len() - 1);
                 }
             }
@@ -400,11 +434,14 @@ fn assign_contributors(
                 .enumerate()
                 .choose(&mut rand::thread_rng())
             {
-                None => {}
+                None => {
+                    debug!("No more contributors to assign");
+                }
                 Some((i, _)) => {
                     let c = &contributors.remove(i);
                     item_contributors
                         .push(Contributor::new(String::from(c.name.as_str()), c.seniority));
+                    info!("Assigned contributor {c} to item {item}");
                 }
             }
         }
@@ -416,6 +453,8 @@ fn assign_contributors(
             item.target_date,
             item_contributors.clone(),
         );
+
+        info!("Finished assigning to roadmap item {new_item}");
         new_items.push(new_item);
     });
     return new_items;
