@@ -4,10 +4,9 @@ extern crate log;
 extern crate simplelog;
 
 use std::io::Write;
-use std::num::ParseIntError;
 use std::{io, process};
 
-use chrono::{NaiveDate, ParseResult};
+use chrono::NaiveDate;
 use rand::prelude::IteratorRandom;
 use simplelog::*;
 use validator::Validate;
@@ -58,7 +57,7 @@ fn create_contributors() -> Vec<Contributor> {
 
         match input.trim_end().to_lowercase().as_str() {
             "y" => {
-                contributors.append(&mut create_contributors_from_file());
+                contributors.append(&mut create_contributors_from_file(read_file_path()));
                 return contributors;
             }
             "n" => {
@@ -72,17 +71,10 @@ fn create_contributors() -> Vec<Contributor> {
     }
 }
 
-fn create_contributors_from_file() -> Vec<Contributor> {
+fn create_contributors_from_file(file_path: String) -> Vec<Contributor> {
     loop {
-        print!("Please provide the absolute path to your contributors file: ");
-        let mut input = String::new();
-        let _ = io::stdout().flush();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Error reading from STDIN");
-
         let mut contributors: Vec<Contributor> = Vec::new();
-        match csv::Reader::from_path(input.trim_end()) {
+        match csv::Reader::from_path(file_path) {
             Ok(mut rdr) => {
                 for contributor_result in rdr.deserialize::<Contributor>() {
                     contributors.push(create_contributor_from_file(contributor_result));
@@ -166,7 +158,7 @@ fn create_roadmap_items() -> Vec<RoadmapItem> {
 
         match input.trim_end().to_lowercase().as_str() {
             "y" => {
-                roadmap_items.append(&mut create_roadmap_items_from_file());
+                roadmap_items.append(&mut create_roadmap_items_from_file(read_file_path()));
                 return roadmap_items;
             }
             "n" => {
@@ -180,17 +172,10 @@ fn create_roadmap_items() -> Vec<RoadmapItem> {
     }
 }
 
-fn create_roadmap_items_from_file() -> Vec<RoadmapItem> {
+fn create_roadmap_items_from_file(file_path: String) -> Vec<RoadmapItem> {
     loop {
-        print!("Please provide the absolute path to your roadmap file: ");
-        let mut input = String::new();
-        let _ = io::stdout().flush();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Error reading from STDIN");
-
         let mut roadmap_items: Vec<RoadmapItem> = Vec::new();
-        match csv::Reader::from_path(input.trim_end()) {
+        match csv::Reader::from_path(file_path) {
             Ok(mut rdr) => {
                 for roadmap_item_result in rdr.deserialize::<RoadmapItem>() {
                     roadmap_items.push(create_roadmap_item_from_file(roadmap_item_result));
@@ -302,13 +287,18 @@ fn parse_string(text: &'static str) -> String {
 fn parse_number(text: &'static str, min: usize, max: usize) -> usize {
     loop {
         print!("{text}: ");
-        match parse_usize() {
-            Ok(complexity) => {
-                if complexity < min || complexity > max {
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+        match input.trim_end().parse::<usize>() {
+            Ok(value) => {
+                if value < min || value > max {
                     warn!("The value must be between {min} and {max}");
                     continue;
                 }
-                return complexity;
+                return value;
             }
             Err(err) => {
                 warn!("Could not parse number: {err}");
@@ -321,7 +311,12 @@ fn parse_number(text: &'static str, min: usize, max: usize) -> usize {
 fn parse_date(input_text: &'static str) -> NaiveDate {
     loop {
         print!("{input_text} (YYYY-mm-dd): ");
-        match read_date() {
+        let mut input = String::new();
+        let _ = io::stdout().flush();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading from STDIN");
+        match NaiveDate::parse_from_str(input.trim_end(), "%Y-%m-%d") {
             Ok(date) => {
                 return date;
             }
@@ -331,24 +326,6 @@ fn parse_date(input_text: &'static str) -> NaiveDate {
             }
         };
     }
-}
-
-fn parse_usize() -> Result<usize, ParseIntError> {
-    let mut input = String::new();
-    let _ = io::stdout().flush();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Error reading from STDIN");
-    return input.trim_end().parse::<usize>();
-}
-
-fn read_date() -> ParseResult<NaiveDate> {
-    let mut input = String::new();
-    let _ = io::stdout().flush();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Error reading from STDIN");
-    NaiveDate::parse_from_str(input.trim_end(), "%Y-%m-%d")
 }
 
 fn assign_contributors(
@@ -451,11 +428,21 @@ fn assign_contributors(
             item.estimated_value,
             item.start_date,
             item.target_date,
-            item_contributors.clone(),
+            item_contributors,
         );
 
         info!("Finished assigning to roadmap item {new_item}");
         new_items.push(new_item);
     });
     return new_items;
+}
+
+fn read_file_path() -> String {
+    print!("Please provide the absolute path to your file: ");
+    let mut input = String::new();
+    let _ = io::stdout().flush();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Error reading from STDIN");
+    return String::from(input.trim_end());
 }
