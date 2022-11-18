@@ -253,9 +253,9 @@ fn create_roadmap_item_from_stdin() -> RoadmapItem {
             continue;
         }
 
-        let today = chrono::offset::Local::today().naive_utc();
+        let today = chrono::offset::Local::now().naive_utc();
         if target_date
-            .signed_duration_since(today)
+            .signed_duration_since(today.date())
             .num_days()
             .is_negative()
         {

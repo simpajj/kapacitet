@@ -7,7 +7,6 @@ use serde::Deserialize;
 use validator::{Validate, ValidationError};
 
 use crate::contributor::Contributor;
-use crate::parse_date;
 
 static MAX_ESTIMATED_COMPLEXITY: f64 = 5.0;
 static MIN_ESTIMATED_COMPLEXITY: f64 = 0.0;
@@ -63,10 +62,6 @@ impl RoadmapItem {
         };
     }
 
-    pub fn add_contributors(mut self, contributors: Vec<Contributor>) {
-        self.contributors = Some(contributors);
-    }
-
     pub fn get_urgency(&self) -> f64 {
         self.urgency.unwrap_or_else(|| 0.0)
     }
@@ -92,9 +87,9 @@ fn calculate_project_urgency(
     target_date: NaiveDate,
 ) -> f64 {
     // 1. Target date - the closer in time the more urgent
-    let today = chrono::offset::Local::today().naive_utc();
+    let today = chrono::offset::Local::now().naive_utc();
     let days_from_today =
-        TARGET_DATE_FACTOR / target_date.signed_duration_since(today).num_days() as f64;
+        TARGET_DATE_FACTOR / target_date.signed_duration_since(today.date()).num_days() as f64;
     debug!("Days from today: {days_from_today}");
 
     // 2. Duration - the shorter the more urgent
@@ -196,10 +191,10 @@ fn validate_dates(item: &RoadmapItem) -> Result<(), ValidationError> {
         ));
     }
 
-    let today = chrono::offset::Local::today().naive_utc();
+    let today = chrono::offset::Local::now().naive_utc();
     if item
         .target_date
-        .signed_duration_since(today)
+        .signed_duration_since(today.date())
         .num_days()
         .is_negative()
     {
@@ -223,8 +218,8 @@ mod tests {
         let result = calculate_project_urgency(
             5,
             5,
-            NaiveDate::from_ymd(2022, 10, 15),
-            NaiveDate::from_ymd(2022, 10, 16),
+            NaiveDate::from_ymd_opt(2022, 10, 15).unwrap(),
+            NaiveDate::from_ymd_opt(2022, 10, 16).unwrap(),
         );
         println!("{result}")
     }
