@@ -11,5 +11,5 @@ csv = "1.1"
 log = "0.4"
 rand = "0.8.5"
 serde = { version = "1", features = ["derive"] }
-simplelog = "0.12.0"
+simplelog = "0.12.1"
 validator = { version = "0.16.0", features = ["derive"] }
